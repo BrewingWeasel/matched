@@ -13,7 +13,7 @@ let%expect_test "simple parsing literal pattern" =
   run_parsing {| "asdf" |};
   [%expect {| literal:"asdf" |}]
 
-let%expect_test "simple parsing literal pattern" =
+let%expect_test "simple parsing either pattern" =
   run_parsing {| "asdf" & "other" | "should prioritize either" |};
   [%expect
     {| multiple[literal:"asdf"; either(literal:"other", literal:"should prioritize either")] |}]
@@ -23,7 +23,7 @@ let%expect_test "simple parsing parens" =
   [%expect
     {| either(multiple[literal:"asdf"; literal:"other"], literal:"should prioritize either") |}]
 
-let%expect_test "simple parsing parens" =
+let%expect_test "simple parsing parens 2" =
   run_parsing {| ("asdf" & "other") | ("first: " & variable & "!") |};
   [%expect
     {| either(multiple[literal:"asdf"; literal:"other"], multiple[literal:"first: "; multiple[var:variable; literal:"!"]]) |}]
