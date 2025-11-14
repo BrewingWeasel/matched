@@ -5,8 +5,8 @@ let run_parsing input =
   match Lexer.lex input with
   | Ok tokens -> (
       match Pattern_parser.parse_pattern tokens with
-      | Ok pattern -> print_endline @@ pattern_to_string pattern
-      | Error e -> print_endline @@ Pattern_parser.error_to_string e)
+      | Ok (pattern, _) -> print_endline @@ pattern_to_string pattern
+      | Error e -> print_endline @@ Parser_error .error_to_string e)
   | Error _ -> print_endline "Lexing error"
 
 let%expect_test "simple parsing literal pattern" =

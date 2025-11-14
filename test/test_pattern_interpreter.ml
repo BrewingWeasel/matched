@@ -1,11 +1,13 @@
-open Matched.Interpreter
+open Matched.Pattern_interpreter
 open Matched.Ast
+open Matched.Scope
 
 let display_vars = function
-  | Some { matched_variables } ->
+  | Some { variables } ->
       VariableMap.iter
-        (fun name value -> Printf.printf "%s: %s\n" name value)
-        matched_variables
+        (fun name value ->
+          Printf.printf "%s: %s\n" name (Matched.Value.to_string value))
+        variables
   | None -> print_endline "no match"
 
 let%expect_test "simple literal (match)" =

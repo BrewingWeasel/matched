@@ -1,17 +1,6 @@
 open Ast
 open Lexer
-
-type error =
-  | UnexpectedToken of token
-  | UnexpectedEndOfInput
-  | ExpectedToken of token
-
-let error_to_string = function
-  | UnexpectedToken token ->
-      Printf.sprintf "Unexpected token: %s" (Lexer.token_to_string token)
-  | UnexpectedEndOfInput -> "Unexpected end of input"
-  | ExpectedToken token ->
-      Printf.sprintf "Expected token: %s" (Lexer.token_to_string token)
+open Parser_error
 
 let ( let* ) = Result.bind
 
@@ -37,7 +26,7 @@ and parse_left token rest =
       | Ok (pattern, next_tokens) -> (
           match next_tokens with
           | TRParen :: after_paren -> Ok (pattern, after_paren)
-          | _ -> Error (ExpectedToken TRParen))
+          | _ -> Error (ExpectedToken [ TRParen ]))
       | Error e -> Error e)
   | _ -> Error (UnexpectedToken token)
 
@@ -52,8 +41,4 @@ and parse_loop min_bp left remaining_tokens =
           Ok (make_expr left right_expr, right_rest)
       | _ -> Ok (left, remaining_tokens))
 
-let parse_pattern tokens =
-  let* pattern, rest = parse_binding_power tokens 0 in
-  match rest with
-  | [] -> Ok pattern
-  | token :: _ -> Error (UnexpectedToken token)
+let parse_pattern tokens = parse_binding_power tokens 0

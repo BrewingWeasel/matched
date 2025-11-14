@@ -1,93 +1,118 @@
-open Ast
-module VariableMap = Map.Make (String)
+open Value
+open Scope
+module StringMap = Map.Make (String)
 
-type context = { matched_variables : string VariableMap.t }
+type context = {
+  patterns : Ast.pattern StringMap.t;
+  functions : Ast.function_ list StringMap.t;
+  scopes : scope list;
+}
 
-let new_context = { matched_variables = VariableMap.empty }
+let context_from_definitions definitions =
+  let rec rec_get_context definitions acc =
+    match definitions with
+    | [] -> acc
+    | def :: rest -> (
+        match def with
+        | Ast.DPattern (name, pattern) ->
+            let new_patterns = StringMap.add name pattern acc.patterns in
+            rec_get_context rest { acc with patterns = new_patterns }
+        | Ast.DFunction (name, function_def) ->
+            let existing_functions =
+              match StringMap.find_opt name acc.functions with
+              | Some funcs -> funcs
+              | None -> []
+            in
+            let new_functions =
+              StringMap.add name
+                (function_def :: existing_functions)
+                acc.functions
+            in
+            rec_get_context rest { acc with functions = new_functions })
+  in
+  rec_get_context definitions
+    { patterns = StringMap.empty; functions = StringMap.empty; scopes = [] }
 
-let rec could_be_start_of_next = function
-  | PVar _ -> fun _ -> true
-  | PLiteral lit -> (
-      match lit |> String.to_seq |> Seq.uncons with
-      | Some (c, _) -> fun x -> x = c
-      | None -> fun _ -> false)
-  | POptional p -> could_be_start_of_next p
-  | PEither (p1, p2) ->
-      let f1 = could_be_start_of_next p1 in
-      let f2 = could_be_start_of_next p2 in
-      fun x -> f1 x || f2 x
-  | PMultiple (first :: _) -> could_be_start_of_next first
-  | PMultiple [] -> fun _ -> false
+type error =
+  | UndefinedFunction of string
+  | NoMatchingFunction of string
+  | UndefinedVariable of string
+  | TypeError of string
 
-let rec match_literal actual pattern ctx =
-  match (Seq.uncons actual, Seq.uncons pattern) with
-  | Some (a, rest_a), Some (p, rest_p) when a = p ->
-      match_literal rest_a rest_p ctx
-  | None, None -> Some (Seq.empty, ctx)
-  | Some (a, rest_a), None -> Some (Seq.append (Seq.singleton a) rest_a, ctx)
-  | _, _ -> None
+let error_to_string = function
+  | UndefinedFunction name -> "Undefined function: " ^ name
+  | NoMatchingFunction name -> "No matching function found for: " ^ name
+  | UndefinedVariable name -> "Undefined variable: " ^ name
+  | TypeError msg -> "Type error: " ^ msg
 
-let rec match_variable inp ctx name acc could_be_end run_end =
-  match Seq.uncons inp with
-  | None ->
-      run_end inp
-        { matched_variables = VariableMap.add name acc ctx.matched_variables }
-  | Some (c, rest) ->
-      if could_be_end c then
-        let new_context =
-          if acc = "" then ctx
-          else
-            {
-              matched_variables = VariableMap.add name acc ctx.matched_variables;
-            }
-        in
-        match run_end inp new_context with
-        | None ->
-            match_variable rest ctx name
-              (acc ^ String.make 1 c)
-              could_be_end run_end
-        | v -> v
-      else
-        match_variable rest ctx name
-          (acc ^ String.make 1 c)
-          could_be_end run_end
+let ( let* ) = Result.bind
 
-let rec match_singular chars ctx pattern =
-  match pattern with
-  | PVar name ->
-      match_variable chars ctx name ""
-        (fun _ -> false)
-        (fun _ ctx -> Some (Seq.empty, ctx))
-  | PLiteral lit -> match_literal chars (String.to_seq lit) ctx
-  | PEither (p1, p2) -> (
-      match match_singular chars ctx p1 with
-      | Some v -> Some v
-      | None -> match_singular chars ctx p2)
-  | POptional p -> (
-      match match_singular chars ctx p with
-      | Some v -> Some v
-      | None -> Some (chars, ctx))
-  | PMultiple patterns -> try_match chars ctx patterns
+let rec get_function_scope values patterns scope =
+  match (values, patterns) with
+  | [], [] -> Some scope
+  | arg_value :: arg_rest, arg_pattern :: pattern_rest -> (
+      match arg_value with
+      | Value.VString s -> (
+          let new_scope = Pattern_interpreter.run_match [ arg_pattern ] s in
+          match new_scope with
+          | Some new_scope ->
+              get_function_scope arg_rest pattern_rest
+                (merge_scopes scope new_scope)
+          | None -> None)
+      | _ -> None)
+  | _ -> None
 
-and try_match chars ctx = function
-  | PVar name :: next :: rest ->
-      match_variable chars ctx name "" (could_be_start_of_next next)
-        (fun inp new_ctx -> try_match inp new_ctx @@ (next :: rest))
-  | PEither (first, second) :: rest -> (
-      let result = try_match chars ctx (first :: rest) in
-      match result with
-      | Some v -> Some v
-      | None -> try_match chars ctx (second :: rest))
-  | POptional pattern :: rest -> (
-      let result = try_match chars ctx (pattern :: rest) in
-      match result with Some v -> Some v | None -> try_match chars ctx rest)
-  | pattern :: rest -> continue rest @@ match_singular chars ctx pattern
-  | [] -> Some (Seq.empty, ctx)
+let match_defined_functions (context : context) name arguments =
+  match StringMap.find_opt name context.functions with
+  | Some function_defs -> (
+      let rec find_matching_function defs =
+        match defs with
+        | [] -> None
+        | (func_def : Ast.function_) :: rest -> (
+            match
+              get_function_scope arguments func_def.arguments Scope.empty_scope
+            with
+            | Some func_scope -> Some (func_scope, func_def)
+            | None -> find_matching_function rest)
+      in
+      match find_matching_function function_defs with
+      | Some scope -> Ok scope
+      | None -> Error (NoMatchingFunction name))
+  | None -> Error (UndefinedFunction name)
 
-and continue rest result =
-  Option.bind result (fun (inp, ctx) -> try_match inp ctx rest)
+let rec eval context expr =
+  match expr with
+  | Ast.EVar name -> (
+      match find_var context.scopes name with
+      | Some value -> Ok value
+      | None -> Error (UndefinedVariable name))
+  | Ast.EString literal -> Ok (VString literal)
+  | Ast.EConcat (first, second) -> (
+      let* first_value = eval context first in
+      let* second_value = eval context second in
+      match (first_value, second_value) with
+      | VString s1, VString s2 -> Ok (VString (s1 ^ s2))
+      | _ -> Error (TypeError "Concatenation requires string values"))
+  | Ast.EFunctionCall (name, arguments) -> eval_function context name arguments
 
-let run_match patterns text =
-  let result = try_match (String.to_seq text) new_context patterns in
-  Option.bind result (fun (inp, ctx) ->
-      if Seq.is_empty inp then Some ctx else None)
+and eval_arguments arguments context =
+  let rec eval_args args acc =
+    match args with
+    | [] -> Ok acc
+    | arg :: rest ->
+        let* evaluated_arg = eval context arg in
+        eval_args rest (evaluated_arg :: acc)
+  in
+  match eval_args arguments [] with
+  | Ok args -> Ok (List.rev args)
+  | Error e -> Error e
+
+and eval_function context name arguments =
+  let* argument_values = eval_arguments arguments context in
+  let* scope, func_def =
+    match_defined_functions context name argument_values
+  in
+  eval { context with scopes = scope :: context.scopes } func_def.expression
+
+let run_main context line = 
+    eval_function context "main" [ Ast.EString line ]
