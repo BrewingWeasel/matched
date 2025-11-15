@@ -25,7 +25,8 @@ and parse_left token rest =
       | Ok (pattern, next_tokens) -> (
           match next_tokens with
           | TRParen :: after_paren -> Ok (pattern, after_paren)
-          | _ -> Error (ExpectedToken [ TRParen ]))
+          | _ -> Error (ExpectedToken ([ TRParen ], List.nth_opt next_tokens 0))
+          )
       | Error e -> Error e)
   | _ -> Error (UnexpectedToken token)
 
@@ -46,7 +47,7 @@ let rec parse_arguments tokens acc =
   match rest with
   | TComma :: after_comma -> parse_arguments after_comma (arg_pattern :: acc)
   | TRParen :: after_rparen -> Ok (List.rev (arg_pattern :: acc), after_rparen)
-  | _ -> Error (ExpectedToken [ TComma; TRParen ])
+  | _ -> Error (ExpectedToken ([ TComma; TRParen ], List.nth_opt rest 0))
 
 let parse_definition tokens =
   match tokens with
@@ -58,11 +59,11 @@ let parse_definition tokens =
           Ok
             ( DFunction (name, { arguments; expression = body_expr }),
               remaining_tokens )
-      | _ -> Error (ExpectedToken [ TEquals ]))
+      | _ -> Error (ExpectedToken ([ TEquals ], List.nth_opt after_args 0)))
   | TPattern :: TIdent name :: TEquals :: rest ->
       let* pattern, remaining_tokens = Pattern_parser.parse_pattern rest in
       Ok (DPattern (name, pattern), remaining_tokens)
-  | _ -> Error (ExpectedToken [ TDef; TPattern ])
+  | _ -> Error (ExpectedToken ([ TDef; TPattern ], List.nth_opt tokens 0))
 
 let parse_file tokens =
   let rec rec_parse_file tokens acc =

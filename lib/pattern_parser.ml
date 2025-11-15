@@ -26,14 +26,15 @@ and parse_left token rest =
       | Ok (pattern, next_tokens) -> (
           match next_tokens with
           | TRParen :: after_paren -> Ok (pattern, after_paren)
-          | _ -> Error (ExpectedToken [ TRParen ]))
+          | _ -> Error (ExpectedToken ([ TRParen ], List.nth_opt next_tokens 0))
+          )
       | Error e -> Error e)
   | _ -> Error (UnexpectedToken token)
 
 and parse_loop min_bp left remaining_tokens =
   match remaining_tokens with
   | [] -> Ok (left, [])
-  | TQuestionMark :: rest -> Ok (Ast.POptional left, rest)
+  | TQuestionMark :: rest -> parse_loop min_bp (Ast.POptional left) rest
   | token :: rest -> (
       match get_binding_power token with
       | Some (bp, make_expr) when bp >= min_bp ->
