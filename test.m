@@ -1,1 +1,3 @@
-def main("hi " & name) = name
+def main(
+	(("thing" & variable)? & "other")
+ = "hello " & name

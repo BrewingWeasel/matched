@@ -1,9 +1,10 @@
 open Value
 open Scope
+open Location
 module StringMap = Map.Make (String)
 
 type context = {
-  patterns : Ast.pattern StringMap.t;
+  patterns : Ast.pattern located_span StringMap.t;
   functions : Ast.function_ list StringMap.t;
   scopes : scope list;
 }
@@ -13,18 +14,18 @@ let context_from_definitions definitions =
     match definitions with
     | [] -> acc
     | def :: rest -> (
-        match def with
+        match def.value with
         | Ast.DPattern (name, pattern) ->
-            let new_patterns = StringMap.add name pattern acc.patterns in
+            let new_patterns = StringMap.add name.value pattern acc.patterns in
             rec_get_context rest { acc with patterns = new_patterns }
         | Ast.DFunction (name, function_def) ->
             let existing_functions =
-              match StringMap.find_opt name acc.functions with
+              match StringMap.find_opt name.value acc.functions with
               | Some funcs -> funcs
               | None -> []
             in
             let new_functions =
-              StringMap.add name
+              StringMap.add name.value
                 (function_def :: existing_functions)
                 acc.functions
             in
@@ -53,7 +54,9 @@ let rec get_function_scope values patterns scope =
   | arg_value :: arg_rest, arg_pattern :: pattern_rest -> (
       match arg_value with
       | Value.VString s -> (
-          let new_scope = Pattern_interpreter.run_match [ arg_pattern ] s in
+          let new_scope =
+            Pattern_interpreter.run_match [ arg_pattern.value ] s
+          in
           match new_scope with
           | Some new_scope ->
               get_function_scope arg_rest pattern_rest
@@ -70,7 +73,8 @@ let match_defined_functions (context : context) name arguments =
         | [] -> None
         | (func_def : Ast.function_) :: rest -> (
             match
-              get_function_scope arguments func_def.arguments Scope.empty_scope
+              get_function_scope arguments func_def.arguments.value
+                Scope.empty_scope
             with
             | Some func_scope -> Some (func_scope, func_def)
             | None -> find_matching_function rest)
@@ -109,10 +113,7 @@ and eval_arguments arguments context =
 
 and eval_function context name arguments =
   let* argument_values = eval_arguments arguments context in
-  let* scope, func_def =
-    match_defined_functions context name argument_values
-  in
-  eval { context with scopes = scope :: context.scopes } func_def.expression
+  let* scope, func_def = match_defined_functions context name argument_values in
+  eval { context with scopes = scope :: context.scopes } func_def.expression.value
 
-let run_main context line = 
-    eval_function context "main" [ Ast.EString line ]
+let run_main context line = eval_function context "main" [ Ast.EString line ]

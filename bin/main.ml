@@ -18,14 +18,15 @@ let rec main_loop context =
 
 let run_file file_name =
   let contents = read_file_to_string file_name in
+  let file_map = Display_error.to_file_map contents in
   match Lexer.lex contents with
   | Ok tokens -> (
       match Parser.parse_file tokens with
       | Ok definitions ->
           let context = Interpreter.context_from_definitions definitions in
           main_loop context
-      | Error err -> print_endline (Parser_error.error_to_string err))
-  | Error err -> print_endline (Lexer.error_to_string err)
+      | Error err -> prerr_endline (Parser_error.display err file_map file_name))
+  | Error err -> prerr_endline (Lexer.display_error err file_map file_name) 
 
 let file_name = Sys.argv.(1)
 let () = run_file file_name

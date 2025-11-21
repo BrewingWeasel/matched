@@ -1,6 +1,7 @@
 open Ast
 open Lexer
 open Parser_error
+open Location
 
 let ( let* ) = Result.bind
 
@@ -19,27 +20,52 @@ let rec parse_binding_power tokens min_bp =
 
 and parse_left token rest =
   match token with
-  | TString s -> Ok (Ast.PLiteral s, rest)
-  | TIdent name -> Ok (Ast.PVar name, rest)
-  | TLParen -> (
+  | { value = TString s; _ } as loc ->
+      Ok ({ loc with value = Ast.PLiteral s }, rest)
+  | { value = TIdent name; _ } as loc ->
+      Ok ({ loc with value = Ast.PVar name }, rest)
+  | { value = TLParen; start_pos; _ } as lparen_loc -> (
       match parse_binding_power rest 0 with
       | Ok (pattern, next_tokens) -> (
           match next_tokens with
-          | TRParen :: after_paren -> Ok (pattern, after_paren)
-          | _ -> Error (ExpectedToken ([ TRParen ], List.nth_opt next_tokens 0))
-          )
+          | { value = TRParen; end_pos; _ } :: after_paren ->
+              Ok ({ pattern with start_pos; end_pos }, after_paren)
+          | _ ->
+              Error
+                (ExpectedToken
+                   ( [
+                       {
+                         token = TRParen;
+                         because =
+                           Some
+                             {
+                               lparen_loc with
+                               value = "To match this opening parenthesis";
+                             };
+                       };
+                     ],
+                     List.nth_opt next_tokens 0 )))
       | Error e -> Error e)
   | _ -> Error (UnexpectedToken token)
 
 and parse_loop min_bp left remaining_tokens =
   match remaining_tokens with
   | [] -> Ok (left, [])
-  | TQuestionMark :: rest -> parse_loop min_bp (Ast.POptional left) rest
+  | { value = TQuestionMark; end_pos; _ } :: rest ->
+      parse_loop min_bp
+        { left with value = Ast.POptional left.value; end_pos }
+        rest
   | token :: rest -> (
-      match get_binding_power token with
+      match get_binding_power token.value with
       | Some (bp, make_expr) when bp >= min_bp ->
           let* right_expr, right_rest = parse_binding_power rest bp in
-          Ok (make_expr left right_expr, right_rest)
+          Ok
+            ( {
+                value = make_expr left.value right_expr.value;
+                start_pos = left.start_pos;
+                end_pos = right_expr.end_pos;
+              },
+              right_rest )
       | _ -> Ok (left, remaining_tokens))
 
 let parse_pattern tokens = parse_binding_power tokens 0

@@ -1,3 +1,5 @@
+open Location
+
 type pattern =
   | PVar of string
   | PLiteral of string
@@ -34,18 +36,24 @@ let rec expression_to_string = function
       let args_str = String.concat ", " (List.map expression_to_string args) in
       "call " ^ name ^ "(" ^ args_str ^ ")"
 
-type function_ = { arguments : pattern list; expression : expression }
+type function_ = {
+  arguments : pattern located_span list located_span;
+  expression : expression located_span;
+}
 
 type definition =
-  | DPattern of string * pattern
-  | DFunction of string * function_
+  | DPattern of string located_span * pattern located_span
+  | DFunction of string located_span * function_
 
 let definition_to_string = function
   | DPattern (name, pattern) ->
-      "pattern:[name=" ^ name ^ "] = " ^ pattern_to_string pattern
+      "pattern:[name=" ^ name.value ^ "] = " ^ pattern_to_string pattern.value
   | DFunction (name, func) ->
       let args_str =
-        String.concat ", " (List.map pattern_to_string func.arguments)
+        String.concat ", "
+          (List.map
+             (fun arg -> pattern_to_string arg.value)
+             func.arguments.value)
       in
-      "function:[name=" ^ name ^ ";args=" ^ args_str ^ "] = "
-      ^ expression_to_string func.expression
+      "function:[name=" ^ name.value ^ ";args=" ^ args_str ^ "] = "
+      ^ expression_to_string func.expression.value
