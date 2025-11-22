@@ -1,4 +1,5 @@
 open Ast
+open Location
 open Scope
 
 let rec could_be_start_of_next = function
@@ -7,12 +8,12 @@ let rec could_be_start_of_next = function
       match lit |> String.to_seq |> Seq.uncons with
       | Some (c, _) -> fun x -> x = c
       | None -> fun _ -> false)
-  | POptional p -> could_be_start_of_next p
+  | POptional p -> could_be_start_of_next p.value
   | PEither (p1, p2) ->
-      let f1 = could_be_start_of_next p1 in
-      let f2 = could_be_start_of_next p2 in
+      let f1 = could_be_start_of_next p1.value in
+      let f2 = could_be_start_of_next p2.value in
       fun x -> f1 x || f2 x
-  | PMultiple (first :: _) -> could_be_start_of_next first
+  | PMultiple (first :: _) -> could_be_start_of_next first.value
   | PMultiple [] -> fun _ -> false
 
 let rec match_literal actual pattern ctx =
@@ -32,7 +33,10 @@ let rec match_variable inp ctx name acc could_be_end run_end =
       if could_be_end c then
         let new_context =
           if acc = "" then ctx
-          else { variables = VariableMap.add name (Value.VString acc) ctx.variables }
+          else
+            {
+              variables = VariableMap.add name (Value.VString acc) ctx.variables;
+            }
         in
         match run_end inp new_context with
         | None ->
@@ -53,26 +57,27 @@ let rec match_singular chars ctx pattern =
         (fun _ ctx -> Some (Seq.empty, ctx))
   | PLiteral lit -> match_literal chars (String.to_seq lit) ctx
   | PEither (p1, p2) -> (
-      match match_singular chars ctx p1 with
+      match match_singular chars ctx p1.value with
       | Some v -> Some v
-      | None -> match_singular chars ctx p2)
+      | None -> match_singular chars ctx p2.value)
   | POptional p -> (
-      match match_singular chars ctx p with
+      match match_singular chars ctx p.value with
       | Some v -> Some v
       | None -> Some (chars, ctx))
-  | PMultiple patterns -> try_match chars ctx patterns
+  | PMultiple patterns ->
+      try_match chars ctx (List.map (fun p -> p.value) patterns)
 
 and try_match chars ctx = function
   | PVar name :: next :: rest ->
       match_variable chars ctx name "" (could_be_start_of_next next)
         (fun inp new_ctx -> try_match inp new_ctx @@ (next :: rest))
   | PEither (first, second) :: rest -> (
-      let result = try_match chars ctx (first :: rest) in
+      let result = try_match chars ctx (first.value :: rest) in
       match result with
       | Some v -> Some v
-      | None -> try_match chars ctx (second :: rest))
+      | None -> try_match chars ctx (second.value :: rest))
   | POptional pattern :: rest -> (
-      let result = try_match chars ctx (pattern :: rest) in
+      let result = try_match chars ctx (pattern.value :: rest) in
       match result with Some v -> Some v | None -> try_match chars ctx rest)
   | pattern :: rest -> continue rest @@ match_singular chars ctx pattern
   | [] -> Some (Seq.empty, ctx)

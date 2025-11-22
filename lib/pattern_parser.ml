@@ -53,7 +53,7 @@ and parse_loop min_bp left remaining_tokens =
   | [] -> Ok (left, [])
   | { value = TQuestionMark; end_pos; _ } :: rest ->
       parse_loop min_bp
-        { left with value = Ast.POptional left.value; end_pos }
+        { left with value = Ast.POptional left; end_pos }
         rest
   | token :: rest -> (
       match get_binding_power token.value with
@@ -61,7 +61,7 @@ and parse_loop min_bp left remaining_tokens =
           let* right_expr, right_rest = parse_binding_power rest bp in
           Ok
             ( {
-                value = make_expr left.value right_expr.value;
+                value = make_expr left right_expr;
                 start_pos = left.start_pos;
                 end_pos = right_expr.end_pos;
               },

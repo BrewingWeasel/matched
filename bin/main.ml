@@ -24,9 +24,15 @@ let run_file file_name =
       match Parser.parse_file tokens with
       | Ok definitions ->
           let context = Interpreter.context_from_definitions definitions in
+          let warnings = Warnings.lint_file context in
+          List.iter
+            (fun warning ->
+              prerr_endline (Warnings.display warning file_map file_name))
+            warnings;
           main_loop context
-      | Error err -> prerr_endline (Parser_error.display err file_map file_name))
-  | Error err -> prerr_endline (Lexer.display_error err file_map file_name) 
+      | Error err -> prerr_endline (Parser_error.display err file_map file_name)
+      )
+  | Error err -> prerr_endline (Lexer.display_error err file_map file_name)
 
 let file_name = Sys.argv.(1)
 let () = run_file file_name

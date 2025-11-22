@@ -92,28 +92,31 @@ let rec eval context expr =
       | None -> Error (UndefinedVariable name))
   | Ast.EString literal -> Ok (VString literal)
   | Ast.EConcat (first, second) -> (
-      let* first_value = eval context first in
-      let* second_value = eval context second in
+      let* first_value = eval context first.value in
+      let* second_value = eval context second.value in
       match (first_value, second_value) with
       | VString s1, VString s2 -> Ok (VString (s1 ^ s2))
       | _ -> Error (TypeError "Concatenation requires string values"))
-  | Ast.EFunctionCall (name, arguments) -> eval_function context name arguments
+  | Ast.EFunctionCall (name, arguments) ->
+      let* args = eval_arguments arguments context in
+      eval_function context name args
 
 and eval_arguments arguments context =
   let rec eval_args args acc =
     match args with
     | [] -> Ok acc
     | arg :: rest ->
-        let* evaluated_arg = eval context arg in
+        let* evaluated_arg = eval context arg.value in
         eval_args rest (evaluated_arg :: acc)
   in
   match eval_args arguments [] with
   | Ok args -> Ok (List.rev args)
   | Error e -> Error e
 
-and eval_function context name arguments =
-  let* argument_values = eval_arguments arguments context in
+and eval_function context name argument_values =
   let* scope, func_def = match_defined_functions context name argument_values in
-  eval { context with scopes = scope :: context.scopes } func_def.expression.value
+  eval
+    { context with scopes = scope :: context.scopes }
+    func_def.expression.value
 
-let run_main context line = eval_function context "main" [ Ast.EString line ]
+let run_main context line = eval_function context "main" [ Value.VString line ]
