@@ -1,6 +1,7 @@
 open Matched.Pattern_interpreter
 open Matched.Ast
 open Matched.Scope
+open Matched.Location
 
 let display_vars = function
   | Some { variables } ->
@@ -9,6 +10,8 @@ let display_vars = function
           Printf.printf "%s: %s\n" name (Matched.Value.to_string value))
         variables
   | None -> print_endline "no match"
+
+let with_span pattern = { value = pattern; start_pos = 0; end_pos = 0 }
 
 let%expect_test "simple literal (match)" =
   display_vars (run_match [ PLiteral "literally!" ] "literally!");
@@ -47,70 +50,102 @@ let%expect_test "literal variable then literal (no match 2)" =
 let%expect_test "simple either first (match)" =
   display_vars
     (run_match
-       [ PEither (PLiteral "literally!", PLiteral "literally!") ]
+       [
+         PEither
+           ( with_span @@ PLiteral "literally!",
+             with_span @@ PLiteral "literally!" );
+       ]
        "literally!");
   [%expect {| |}]
 
 let%expect_test "simple either second (match)" =
   display_vars
     (run_match
-       [ PEither (PLiteral "literally!", PLiteral "literally 2!") ]
+       [
+         PEither
+           ( with_span @@ PLiteral "literally!",
+             with_span @@ PLiteral "literally 2!" );
+       ]
        "literally 2!");
   [%expect {| |}]
 
 let%expect_test "either ends with variable" =
   display_vars
     (run_match
-       [ PLiteral "Value is: "; PEither (PLiteral "none", PVar "value") ]
+       [
+         PLiteral "Value is: ";
+         PEither (with_span @@ PLiteral "none", with_span @@ PVar "value");
+       ]
        "Value is: 46");
   [%expect {| value: 46 |}]
 
 let%expect_test "either ends with variable but is literal" =
   display_vars
     (run_match
-       [ PLiteral "Value is: "; PEither (PLiteral "none", PVar "value") ]
+       [
+         PLiteral "Value is: ";
+         PEither (with_span @@ PLiteral "none", with_span @@ PVar "value");
+       ]
        "Value is: none");
   [%expect {| |}]
 
 let%expect_test "either with variable then literal (as variable)" =
   display_vars
     (run_match
-       [ PEither (PLiteral "_", PVar "value"); PLiteral " then literal" ]
+       [
+         PEither (with_span @@ PLiteral "_", with_span @@ PVar "value");
+         PLiteral " then literal";
+       ]
        "46 then literal");
   [%expect {| value: 46 |}]
 
 let%expect_test "either with variable then literal (as literal)" =
   display_vars
     (run_match
-       [ PEither (PLiteral "_", PVar "value"); PLiteral " then literal" ]
+       [
+         PEither (with_span @@ PLiteral "_", with_span @@ PVar "value");
+         PLiteral " then literal";
+       ]
        "_ then literal");
   [%expect {| |}]
 
 let%expect_test "simple optional (optional missing)" =
   display_vars
     (run_match
-       [ PLiteral "hi"; POptional (PLiteral ", there"); PLiteral "!" ]
+       [
+         PLiteral "hi";
+         POptional (with_span @@ PLiteral ", there");
+         PLiteral "!";
+       ]
        "hi!");
   [%expect {| |}]
 
 let%expect_test "simple optional (optional present)" =
   display_vars
     (run_match
-       [ PLiteral "hi"; POptional (PLiteral " there"); PLiteral "!" ]
+       [
+         PLiteral "hi"; POptional (with_span @@ PLiteral " there"); PLiteral "!";
+       ]
        "hi there!");
   [%expect {| |}]
 
 let%expect_test "optional variable at start (variable present)" =
   display_vars
     (run_match
-       [ POptional (PVar "introduction"); PLiteral "Nice to meet you!" ]
+       [
+         POptional (with_span @@ PVar "introduction");
+         PLiteral "Nice to meet you!";
+       ]
        "hi! Nice to meet you!");
   [%expect {| introduction: hi!  |}]
 
 let%expect_test "optional variable at start (variable missing)" =
   display_vars
     (run_match
-       [ POptional (PVar "introduction"); PLiteral "Nice to meet you!" ]
+       [
+         POptional (with_span @@ PVar "introduction");
+         PLiteral "Nice to meet you!";
+       ]
        "Nice to meet you!");
   [%expect {| |}]
 
@@ -119,7 +154,11 @@ let%expect_test "simple multiple" =
     (run_match
        [
          PMultiple
-           [ PLiteral "hi"; POptional (PLiteral ", there"); PLiteral "!" ];
+           [
+             with_span @@ PLiteral "hi";
+             with_span @@ POptional (with_span @@ PLiteral ", there");
+             with_span @@ PLiteral "!";
+           ];
        ]
        "hi!");
   [%expect {| |}]
@@ -129,9 +168,20 @@ let%expect_test "multiple either" =
     (run_match
        [
          PEither
-           ( PMultiple
-               [ PLiteral "hi"; POptional (PLiteral ", there"); PLiteral "!" ],
-             PMultiple [ PLiteral "Yo "; PVar "name"; PLiteral "!" ] );
+           ( with_span
+             @@ PMultiple
+                  [
+                    with_span @@ PLiteral "hi";
+                    with_span @@ POptional (with_span @@ PLiteral ", there");
+                    with_span @@ PLiteral "!";
+                  ],
+             with_span
+             @@ PMultiple
+                  [
+                    with_span @@ PLiteral "Yo ";
+                    with_span @@ PVar "name";
+                    with_span @@ PLiteral "!";
+                  ] );
        ]
        "hi!");
   [%expect {| |}]
