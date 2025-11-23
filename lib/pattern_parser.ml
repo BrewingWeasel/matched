@@ -27,7 +27,7 @@ and parse_left token rest =
   | { value = TDollars; start_pos; _ } -> (
       match rest with
       | { value = TIdent name; end_pos; _ } :: after_ident ->
-          Ok ({ value = Ast.PReference name; start_pos; end_pos }, after_ident)
+          Ok ({ value = Ast.PReference name; start_pos; end_pos = end_pos + 1 }, after_ident)
       | _ ->
           Error
             (ExpectedToken

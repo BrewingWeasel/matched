@@ -1,11 +1,12 @@
 open Value
 open Scope
 open Location
+open Ast
 module StringMap = Map.Make (String)
 
 type context = {
-  patterns : Ast.pattern located_span StringMap.t;
-  functions : Ast.function_ list StringMap.t;
+  patterns : (string located_span * Ast.pattern located_span) StringMap.t;
+  functions : (string located_span * Ast.function_) list StringMap.t;
   scopes : scope list;
 }
 
@@ -16,7 +17,9 @@ let context_from_definitions definitions =
     | def :: rest -> (
         match def.value with
         | Ast.DPattern (name, pattern) ->
-            let new_patterns = StringMap.add name.value pattern acc.patterns in
+            let new_patterns =
+              StringMap.add name.value (name, pattern) acc.patterns
+            in
             rec_get_context rest { acc with patterns = new_patterns }
         | Ast.DFunction (name, function_def) ->
             let existing_functions =
@@ -26,7 +29,7 @@ let context_from_definitions definitions =
             in
             let new_functions =
               StringMap.add name.value
-                (function_def :: existing_functions)
+                ((name, function_def) :: existing_functions)
                 acc.functions
             in
             rec_get_context rest { acc with functions = new_functions })
@@ -55,7 +58,8 @@ let rec get_function_scope context values patterns scope =
       match arg_value with
       | Value.VString s -> (
           let new_scope =
-            Pattern_interpreter.run_match [ arg_pattern.value ]  s context.patterns
+            Pattern_interpreter.run_match [ arg_pattern.value ] s
+              context.patterns
           in
           match new_scope with
           | Some new_scope ->
@@ -71,7 +75,7 @@ let match_defined_functions (context : context) name arguments =
       let rec find_matching_function defs =
         match defs with
         | [] -> None
-        | (func_def : Ast.function_) :: rest -> (
+        | (_, func_def) :: rest -> (
             match
               get_function_scope context arguments func_def.arguments.value
                 (Scope.new_scope context.patterns)

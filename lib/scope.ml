@@ -10,7 +10,7 @@ type scope = {
 let new_scope global_patterns =
   {
     variables = VariableMap.empty;
-    global_patterns = VariableMap.map (fun pattern -> pattern.value) global_patterns;
+    global_patterns = VariableMap.map (fun (_name, pattern) -> pattern.value) global_patterns;
   }
 
 let merge_scopes scope1 scope2 =

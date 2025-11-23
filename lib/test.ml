@@ -30,7 +30,7 @@ let test_function context _func_name function_defs (passed, num_functions, total
   Printf.printf "Testing function \x1b[34m'%s'\x1b[0m..." _func_name;
   let newly_passed, newly_ran =
     List.fold_left
-      (fun (acc_passed, acc_ran) function_ ->
+      (fun (acc_passed, acc_ran) (_, function_) ->
         run_assertions context function_.assertions acc_passed acc_ran)
       (0, 0) function_defs
   in

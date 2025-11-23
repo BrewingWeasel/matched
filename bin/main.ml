@@ -43,11 +43,7 @@ let run_file file_name run_with =
       match Parser.parse_file tokens with
       | Ok definitions ->
           let context = Interpreter.context_from_definitions definitions in
-          let warnings = Warnings.lint_file context in
-          List.iter
-            (fun warning ->
-              prerr_endline (Warnings.display warning file_map file_name))
-            warnings;
+          Analyzer.lint_file context file_map file_name;
           run_with context
       | Error err -> prerr_endline (Parser_error.display err file_map file_name)
       )
