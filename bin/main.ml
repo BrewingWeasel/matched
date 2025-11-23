@@ -1,20 +1,36 @@
 open Matched
 
+let usage_msg = "lilac <file1> -f <function> -i <input>"
+let input_file = ref ""
+let main_function = ref "main"
+let input = ref ""
+let anon_fun filename = input_file := filename
+
+let speclist =
+  [
+    ("-f", Arg.Set_string main_function, "Set default function");
+    ("-i", Arg.Set_string input, "Use specific input");
+  ]
+
+let () = Arg.parse speclist anon_fun usage_msg
+
 let read_file_to_string file =
   In_channel.with_open_text file In_channel.input_all
+
+let run_primary line context continue =
+  match Interpreter.run_main context !main_function line with
+  | Ok value ->
+      print_endline (Value.to_string value);
+      continue context
+  | Error err ->
+      print_endline ("Error: " ^ Interpreter.error_to_string err);
+      continue context
 
 let rec main_loop context =
   print_string "> ";
   let line = read_line () in
   if line = ":quit" || line = ":q" then ()
-  else
-    match Interpreter.run_main context line with
-    | Ok value ->
-        print_endline (Value.to_string value);
-        main_loop context
-    | Error err ->
-        print_endline ("Error: " ^ Interpreter.error_to_string err);
-        main_loop context
+  else run_primary line context main_loop
 
 let run_file file_name =
   let contents = read_file_to_string file_name in
@@ -29,7 +45,8 @@ let run_file file_name =
             (fun warning ->
               prerr_endline (Warnings.display warning file_map file_name))
             warnings;
-          main_loop context
+          if !input == "" then main_loop context
+          else run_primary !input context (fun _ -> ())
       | Error err -> prerr_endline (Parser_error.display err file_map file_name)
       )
   | Error err -> prerr_endline (Lexer.display_error err file_map file_name)

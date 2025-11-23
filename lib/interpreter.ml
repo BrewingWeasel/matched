@@ -119,4 +119,5 @@ and eval_function context name argument_values =
     { context with scopes = scope :: context.scopes }
     func_def.expression.value
 
-let run_main context line = eval_function context "main" [ Value.VString line ]
+let run_main context function_ line =
+  eval_function context function_ [ Value.VString line ]
