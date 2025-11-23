@@ -7,7 +7,7 @@ let ( let* ) = Result.bind
 
 let get_binding_power token =
   match token with
-  | TAmpersand -> Some (1, fun first second -> EConcat (first, second))
+  | TPlus -> Some (1, fun first second -> EConcat (first, second))
   | _ -> None
 
 let rec parse_binding_power tokens min_bp =

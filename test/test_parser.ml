@@ -28,17 +28,17 @@ let%expect_test "simple parsing literal pattern" =
   [%expect {| literal:"asdf"{1:6} |}]
 
 let%expect_test "simple parsing either pattern" =
-  run_pattern_parsing {| "asdf" & "other" | "should prioritize either" |};
+  run_pattern_parsing {| "asdf" + "other" | "should prioritize either" |};
   [%expect
     {| multiple[literal:"asdf"; either(literal:"other", literal:"should prioritize either")]{1:45} |}]
 
 let%expect_test "simple parsing parens" =
-  run_pattern_parsing {| ("asdf" & "other") | "should prioritize either" |};
+  run_pattern_parsing {| ("asdf" + "other") | "should prioritize either" |};
   [%expect
     {| either(multiple[literal:"asdf"; literal:"other"], literal:"should prioritize either"){1:47} |}]
 
 let%expect_test "simple parsing parens 2" =
-  run_pattern_parsing {| ("asdf" & "other") | ("first: " & variable & "!") |};
+  run_pattern_parsing {| ("asdf" + "other") | ("first: " + variable + "!") |};
   [%expect
     {| either(multiple[literal:"asdf"; literal:"other"], multiple[literal:"first: "; multiple[var:variable; literal:"!"]]){1:49} |}]
 
@@ -47,13 +47,13 @@ let%expect_test "simple parsing postfix" =
   [%expect {| optional(literal:"asdf"){1:7} |}]
 
 let%expect_test "simple parsing parens then optional" =
-  run_pattern_parsing {| ("asdf" & "other")? |};
+  run_pattern_parsing {| ("asdf" + "other")? |};
   [%expect {| optional(multiple[literal:"asdf"; literal:"other"]){1:19} |}]
 
 let%expect_test "parsing basic pattern" =
   run_definition_parsing
     {| 
-pattern awesome_pattern = ("asdf" & "other")? & "next"
+pattern awesome_pattern = ("asdf" + "other")? + "next"
   |};
   [%expect
     {| pattern:[name=awesome_pattern] = multiple[optional(multiple[literal:"asdf"; literal:"other"]); literal:"next"]{2:26} |}]
@@ -62,10 +62,10 @@ let%expect_test "parsing basic function definition" =
   run_definition_parsing
     {| 
 def main(
-	(("thing" & variable)? & "other") | "single"
+	(("thing" + variable)? + "other") | "single"
 ) 
-    "hello " & name
+    "hello " + name
 end
   |};
   [%expect
-    {| function:[name=main;args=either(multiple[optional(multiple[literal:"thing"; var:variable]); literal:"other"], literal:"single")] = concat(string:"hello ", var:name){2:60} |}]
+    {| function:[name=main;args=either(multiple[optional(multiple[literal:"thing"; var:variable]); literal:"other"], literal:"single")] = concat(string:"hello ", var:name){2:58} |}]

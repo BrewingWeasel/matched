@@ -7,7 +7,7 @@ let ( let* ) = Result.bind
 
 let get_binding_power token =
   match token with
-  | TAmpersand -> Some (1, fun first second -> PMultiple [ first; second ])
+  | TPlus -> Some (1, fun first second -> PMultiple [ first; second ])
   | TPipe -> Some (4, fun first second -> PEither (first, second))
   | _ -> None
 
