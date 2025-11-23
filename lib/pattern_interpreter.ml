@@ -111,6 +111,10 @@ and try_match chars (ctx : context) scope = function
   | PVar name :: next :: rest ->
       match_variable chars ctx scope name "" (could_be_start_of_next scope next)
         (fun inp new_scope -> try_match inp ctx new_scope @@ (next :: rest))
+  | PReference name :: rest -> (
+      match VariableMap.find_opt name scope.global_patterns with
+      | Some pattern -> try_match chars ctx scope (pattern :: rest)
+      | None -> None)
   | PEither (first, second) :: rest -> (
       let result = try_match chars ctx scope (first.value :: rest) in
       match result with
@@ -121,6 +125,11 @@ and try_match chars (ctx : context) scope = function
       match result with
       | Some v -> Some v
       | None -> try_match chars ctx scope rest)
+  | PMultiple patterns :: rest -> (
+      let result =
+        try_match chars ctx scope (List.map (fun p -> p.value) patterns @ rest)
+      in
+      match result with Some v -> Some v | None -> None)
   | pattern :: rest ->
       continue rest ctx @@ match_singular chars ctx scope pattern
   | [] -> Some (Seq.empty, scope)

@@ -10,6 +10,29 @@ let get_binding_power token =
   | TPlus -> Some (1, fun first second -> EConcat (first, second))
   | _ -> None
 
+let rec parse_arguments parser tokens lparen_loc acc =
+  let* arg_pattern, rest = parser tokens in
+  match rest with
+  | { value = TComma; _ } :: after_comma ->
+      parse_arguments parser after_comma lparen_loc (arg_pattern :: acc)
+  | { value = TRParen; end_pos; _ } :: after_rparen ->
+      Ok (List.rev (arg_pattern :: acc), end_pos, after_rparen)
+  | _ ->
+      Error
+        (ExpectedToken
+           ( [
+               {
+                 token = TRParen;
+                 because =
+                   Some
+                     {
+                       lparen_loc with
+                       value = "To match this opening parenthesis";
+                     };
+               };
+             ],
+             List.nth_opt rest 0 ))
+
 let rec parse_binding_power tokens min_bp =
   match tokens with
   | [] -> Error UnexpectedEndOfInput
@@ -20,8 +43,22 @@ let rec parse_binding_power tokens min_bp =
 and parse_left token rest =
   match token with
   | { value = TString s; _ } as loc -> Ok ({ loc with value = EString s }, rest)
-  | { value = TIdent name; _ } as loc ->
-      Ok ({ loc with value = EVar name }, rest)
+  | { value = TIdent name; _ } as loc -> (
+      match rest with
+      | ({ value = TLParen; _ } as lparen_loc) :: rest ->
+          let* arguments, args_end, after_args =
+            parse_arguments
+              (fun tokens -> parse_binding_power tokens 0)
+              rest lparen_loc []
+          in
+          Ok
+            ( {
+                value = EFunctionCall (name, arguments);
+                start_pos = loc.start_pos;
+                end_pos = args_end;
+              },
+              after_args )
+      | _ -> Ok ({ loc with value = EVar name }, rest))
   | { value = TLParen; start_pos; _ } as lparen_loc -> (
       match parse_binding_power rest 0 with
       | Ok (pattern, next_tokens) -> (
@@ -64,29 +101,6 @@ and parse_loop min_bp left remaining_tokens =
 
 let parse_expr tokens = parse_binding_power tokens 0
 
-let rec parse_arguments tokens lparen_loc acc =
-  let* arg_pattern, rest = Pattern_parser.parse_pattern tokens in
-  match rest with
-  | { value = TComma; _ } :: after_comma ->
-      parse_arguments after_comma lparen_loc (arg_pattern :: acc)
-  | { value = TRParen; end_pos; _ } :: after_rparen ->
-      Ok (List.rev (arg_pattern :: acc), end_pos, after_rparen)
-  | _ ->
-      Error
-        (ExpectedToken
-           ( [
-               {
-                 token = TRParen;
-                 because =
-                   Some
-                     {
-                       lparen_loc with
-                       value = "To match this opening parenthesis";
-                     };
-               };
-             ],
-             List.nth_opt rest 0 ))
-
 let parse_pattern_definition tokens =
   match tokens with
   | { value = TPattern; start_pos; _ }
@@ -114,7 +128,7 @@ let parse_where_assertions tokens =
     | input ->
         let* first_expr, remaining_tokens = parse_expr input in
         let* remaining_tokens =
-          expect_token remaining_tokens TEquals
+          expect_token remaining_tokens TDoubleEquals
             (Some
                {
                  value = "To match the 'where' assertion syntax";
@@ -145,7 +159,7 @@ let parse_definition tokens =
     :: ({ value = TLParen; start_pos = args_start; _ } as lparen_loc)
     :: rest ->
       let* arguments, args_end, after_args =
-        parse_arguments rest lparen_loc []
+        parse_arguments Pattern_parser.parse_pattern rest lparen_loc []
       in
       let* body_expr, remaining_tokens = parse_expr after_args in
       let arguments =

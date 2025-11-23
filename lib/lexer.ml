@@ -12,6 +12,7 @@ type token =
   | TPlus
   | TColon
   | TDollars
+  | TDoubleEquals
   | TDef
   | TPattern
   | TWhere
@@ -26,12 +27,13 @@ let token_to_string = function
   | TLParen -> "("
   | TRParen -> ")"
   | TQuestionMark -> "?"
-  | TEquals -> "="
   | TComma -> ","
   | TSemicolon -> ";"
   | TPlus -> "+"
   | TColon -> ":"
   | TDollars -> "$"
+  | TEquals -> "="
+  | TDoubleEquals -> "=="
   | TDef -> "def"
   | TEnd -> "end"
   | TPattern -> "pattern"
@@ -123,12 +125,17 @@ let rec do_lex chars acc =
   | Some ((i, '('), rest) -> lex_symbol rest TLParen i
   | Some ((i, ')'), rest) -> lex_symbol rest TRParen i
   | Some ((i, '?'), rest) -> lex_symbol rest TQuestionMark i
-  | Some ((i, '='), rest) -> lex_symbol rest TEquals i
   | Some ((i, ','), rest) -> lex_symbol rest TComma i
   | Some ((i, ';'), rest) -> lex_symbol rest TSemicolon i
   | Some ((i, '+'), rest) -> lex_symbol rest TPlus i
   | Some ((i, ':'), rest) -> lex_symbol rest TColon i
   | Some ((i, '$'), rest) -> lex_symbol rest TDollars i
+  | Some ((start_pos, '='), rest) -> (
+      match Seq.uncons rest with
+      | Some ((end_pos, '='), rest_after_eq) ->
+          do_lex rest_after_eq
+            ({ value = TDoubleEquals; start_pos; end_pos } :: acc)
+      | _ -> lex_symbol rest TEquals start_pos)
   | Some ((start_pos, c), rest) when is_alphanumeric c ->
       let* ident, end_pos, rest_chars =
         lex_ident (String.make 1 c) rest start_pos
