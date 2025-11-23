@@ -1,4 +1,4 @@
 (executable
- (public_name matched)
+ (public_name lilac)
  (name main)
- (libraries matched))
+ (libraries lilac))

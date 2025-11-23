@@ -1,4 +1,4 @@
-open Matched
+open Lilac
 
 let usage_msg = "lilac <file1> -f <function> -i <input>"
 let input_file = ref ""

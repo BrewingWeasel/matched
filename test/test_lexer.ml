@@ -1,5 +1,5 @@
-open Matched.Lexer
-open Matched.Location
+open Lilac.Lexer
+open Lilac.Location
 
 let display_lexed_tokens tokens =
   match tokens with

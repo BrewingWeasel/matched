@@ -1,5 +1,5 @@
 (library
- (name test_matched)
- (libraries matched)
+ (name test_lilac)
+ (libraries lilac)
  (inline_tests)
  (preprocess (pps ppx_expect)))

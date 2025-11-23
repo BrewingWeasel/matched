@@ -1,13 +1,13 @@
-open Matched.Pattern_interpreter
-open Matched.Ast
-open Matched.Scope
-open Matched.Location
+open Lilac.Pattern_interpreter
+open Lilac.Ast
+open Lilac.Scope
+open Lilac.Location
 
 let display_vars = function
   | Some { variables; _ } ->
       VariableMap.iter
         (fun name value ->
-          Printf.printf "%s: %s\n" name (Matched.Value.to_string value))
+          Printf.printf "%s: %s\n" name (Lilac.Value.to_string value))
         variables
   | None -> print_endline "no match"
 
