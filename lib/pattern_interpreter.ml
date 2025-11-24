@@ -37,7 +37,7 @@ let rec match_literal actual pattern ctx scope =
   | Some (a, rest_a), Some (p, rest_p) when a = p ->
       match_literal rest_a rest_p ctx scope
   | None, None -> Some (Seq.empty, scope)
-  | Some (a, rest_a), None -> Some (Seq.append (Seq.singleton a) rest_a, scope)
+  | Some _, None -> Some (actual, scope)
   | _, _ -> None
 
 let rec match_variable inp ctx scope name acc could_be_end run_end =
