@@ -27,7 +27,9 @@ and parse_left token rest =
   | { value = TDollars; start_pos; _ } -> (
       match rest with
       | { value = TIdent name; end_pos; _ } :: after_ident ->
-          Ok ({ value = Ast.PReference name; start_pos; end_pos = end_pos + 1 }, after_ident)
+          Ok
+            ( { value = Ast.PReference name; start_pos; end_pos = end_pos + 1 },
+              after_ident )
       | _ ->
           Error
             (ExpectedToken
@@ -73,6 +75,36 @@ and parse_loop min_bp left remaining_tokens =
   | [] -> Ok (left, [])
   | { value = TQuestionMark; end_pos; _ } :: rest ->
       parse_loop min_bp { left with value = Ast.POptional left; end_pos } rest
+  | { value = TAs; end_pos = attr_start_pos; _ } :: rest ->
+      let* attribute, remaining_tokens =
+        match rest with
+        | ({ value = TIdent variable_name; end_pos; _ } as ident_loc) :: rest ->
+            Ok
+              ( {
+                  value =
+                    Ast.PAs ({ ident_loc with value = variable_name }, left);
+                  start_pos = left.start_pos;
+                  end_pos;
+                },
+                rest )
+        | _ ->
+            Error
+              (ExpectedToken
+                 ( [
+                     {
+                       token = TIdent "";
+                       because =
+                         Some
+                           {
+                             value = "An variable name is expected after `as`";
+                             start_pos = attr_start_pos;
+                             end_pos = attr_start_pos;
+                           };
+                     };
+                   ],
+                   List.nth_opt rest 0 ))
+      in
+      parse_loop min_bp attribute remaining_tokens
   | { value = TColon; end_pos = attr_start_pos; _ } :: rest ->
       let* attribute, remaining_tokens =
         match rest with

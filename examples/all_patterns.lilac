@@ -1,0 +1,32 @@
+def variable("My name is " + name + "!")
+	"Your name is " + name + "."
+where
+	variable("My name is Alice!") == "Your name is Alice.";
+end
+
+def optional("My name is " + name + "!"?)
+	"Your name is " + name + "."
+where
+	optional("My name is Alice!") == "Your name is Alice.";
+	optional("My name is Bob") == "Your name is Bob.";
+end
+
+def transform_case("my name is ":lower + name + "!")
+	"Your name is " + name + "."
+where
+	transform_case("MY name IS Alice!") == "Your name is Alice.";
+end
+
+def either(("my name is " | "i'm " | "i am "):lower + name + "!")
+	"Your name is " + name + "."
+where
+	either("I'm Alice!") == "Your name is Alice.";
+	either("My name is Bob!") == "Your name is Bob.";
+end
+
+def as_pattern("My name is " + (_name + ("!" | ".")) as name_with_punctuation )
+	"Your name is " + name_with_punctuation
+where
+	as_pattern("My name is Alice!") == "Your name is Alice!";
+	as_pattern("My name is Alice.") == "Your name is Alice.";
+end

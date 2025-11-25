@@ -2,12 +2,16 @@ open Ast
 open Location
 open Scope
 
-type context = { char_updater : (char -> char) Option.t }
+type context = {
+  char_updater : (char -> char) Option.t;
+  trying_to_match : string;
+}
 
-let default_context = { char_updater = None }
+let default_context = { char_updater = None; trying_to_match = "" }
 
 let rec could_be_start_of_next scope = function
   | PVar _ -> fun _ -> true
+  | PAs (_name, pattern) -> could_be_start_of_next scope pattern.value
   | PReference name -> (
       match VariableMap.find_opt name scope.global_patterns with
       | Some pattern -> could_be_start_of_next scope pattern
@@ -28,7 +32,7 @@ let rec could_be_start_of_next scope = function
 let next_char seq ctx =
   match Seq.uncons seq with
   | None -> None
-  | Some (c, rest) ->
+  | Some ((_, c), rest) ->
       let c = match ctx.char_updater with Some f -> f c | None -> c in
       Some (c, rest)
 
@@ -77,8 +81,10 @@ let context_from_attribute ctx =
     | None -> new_updater
   in
   function
-  | "upper" -> { char_updater = Some (add_char_updater Char.uppercase_ascii) }
-  | "lower" -> { char_updater = Some (add_char_updater Char.lowercase_ascii) }
+  | "upper" ->
+      { ctx with char_updater = Some (add_char_updater Char.uppercase_ascii) }
+  | "lower" ->
+      { ctx with char_updater = Some (add_char_updater Char.lowercase_ascii) }
   | _ -> default_context
 
 let rec match_singular chars (ctx : context) scope pattern =
@@ -87,6 +93,32 @@ let rec match_singular chars (ctx : context) scope pattern =
       match_variable chars ctx scope name ""
         (fun _ -> false)
         (fun _ scope -> Some (Seq.empty, scope))
+  | PAs (name, p) -> (
+      let start_at : int =
+        match Seq.uncons chars with
+        | Some ((i, _), _) -> i
+        | None -> String.length ctx.trying_to_match
+      in
+      match match_singular chars ctx scope p.value with
+      | Some (rest, new_scope) ->
+          let end_at : int =
+            match Seq.uncons rest with
+            | Some ((i, _), _) -> i
+            | None -> String.length ctx.trying_to_match
+          in
+          let matched_string =
+            String.sub ctx.trying_to_match start_at (end_at - start_at)
+          in
+          let updated_scope =
+            {
+              new_scope with
+              variables =
+                VariableMap.add name.value (Value.VString matched_string)
+                  scope.variables;
+            }
+          in
+          Some (rest, updated_scope)
+      | None -> None)
   | PReference name -> (
       match VariableMap.find_opt name scope.global_patterns with
       | Some pattern -> match_singular chars ctx scope pattern
@@ -139,7 +171,8 @@ and continue rest ctx result =
 
 let run_match patterns text global_patterns =
   let result =
-    try_match (String.to_seq text) default_context
+    try_match (String.to_seqi text)
+      { default_context with trying_to_match = text }
       (new_scope global_patterns)
       patterns
   in

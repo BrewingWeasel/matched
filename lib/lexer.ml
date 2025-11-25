@@ -17,6 +17,7 @@ type token =
   | TPattern
   | TWhere
   | TEnd
+  | TAs
   | TNumber of int
   | TIdent of string
   | TString of string
@@ -38,6 +39,7 @@ let token_to_string = function
   | TEnd -> "end"
   | TPattern -> "pattern"
   | TWhere -> "where"
+  | TAs -> "as"
   | TNumber n -> Printf.sprintf "Number(%d)" n
   | TIdent id -> Printf.sprintf "Ident(%s)" id
   | TString s -> Printf.sprintf "String(%s)" s
@@ -153,6 +155,7 @@ let rec do_lex chars acc =
         | "pattern" -> TPattern
         | "where" -> TWhere
         | "end" -> TEnd
+        | "as" -> TAs
         | _ -> TIdent ident
       in
       do_lex rest_chars ({ value = token; start_pos; end_pos } :: acc)

@@ -98,6 +98,7 @@ let rec lint_pattern context acc pattern =
       let acc = lint_pattern context acc first in
       lint_pattern context acc second
   | POptional inner -> lint_pattern context acc inner
+  | PAs (_name, inner) -> lint_pattern context acc inner
   | PMultiple members -> List.fold_left (lint_pattern context) acc members
   | PWithAttribute (inner, _attribute) -> (lint_pattern context) acc inner
 

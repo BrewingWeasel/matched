@@ -6,6 +6,7 @@ type pattern =
   | PLiteral of string
   | PEither of pattern located_span * pattern located_span
   | POptional of pattern located_span
+  | PAs of string located_span * pattern located_span
   | PMultiple of pattern located_span list
   | PWithAttribute of pattern located_span * string located_span
 
@@ -31,6 +32,8 @@ let rec pattern_to_string = function
       ^ ", "
       ^ attribute.value
       ^ ")"
+  | PAs (name, pattern) ->
+      "as(" ^ name.value ^ ", " ^ pattern_to_string pattern.value ^ ")"
 
 type expression =
   | EVar of string
