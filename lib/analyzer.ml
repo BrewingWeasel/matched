@@ -85,8 +85,14 @@ let rec lint_pattern context acc pattern =
           :: acc)
   | PLiteral _ -> acc
   | PEither (first, second) ->
+      let is_redundant =
+        match (first.value, second.value) with
+        | p1, p2 when p1 = p2 -> true
+        | PVar _, _ -> true
+        | _, _ -> false
+      in
       let acc =
-        if first.value = second.value then
+        if is_redundant then
           {
             value = RedundantPattern (first, second);
             start_pos = second.start_pos;
